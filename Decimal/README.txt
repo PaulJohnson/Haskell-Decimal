@@ -42,3 +42,9 @@ Version 0.2.2
 -------------
 
 Minor fixes to allow compilation under other versions of GHC.
+
+Version 0.2.3
+-------------
+
+Added instance of NFData from Control.DeepSeq, and hence a dependency
+on the deepseq package, thanks to Jeff Shaw (shawjef3 at msu.edu).

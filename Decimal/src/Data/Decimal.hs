@@ -43,7 +43,7 @@ module Data.Decimal (
    prop_signum
 ) where
 
-
+import Control.DeepSeq
 import Data.Char
 import Data.Ratio
 import Data.Word
@@ -79,6 +79,8 @@ data (Integral i) => DecimalRaw i = Decimal {
 -- to and from @Integer@.
 type Decimal = DecimalRaw Integer
 
+instance (Integral i, NFData i) => NFData (DecimalRaw i) where
+    rnf (Decimal _ i) = rnf i
 
 -- | Convert a real fractional value into a Decimal of the appropriate 
 -- precision.

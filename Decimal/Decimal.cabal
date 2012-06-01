@@ -1,5 +1,5 @@
 Name:                Decimal
-Version:             0.2.2
+Version:             0.2.3
 License:             BSD3
 License-file:        LICENSE.txt
 Copyright:           Paul Johnson, 2011
@@ -19,6 +19,7 @@ tested-with:         GHC==7.0.4
 library 
   build-depends:    
                     base >= 4 && < 5,
+                    deepseq,
                     QuickCheck >= 2.4
   hs-source-dirs:   src
   if impl(ghc >= 7.0.0)
@@ -35,7 +36,8 @@ test-suite Main
                    QuickCheck >= 2.4,
                    test-framework >= 0.4.1,
                    test-framework-quickcheck2,
-                   test-framework-hunit
+                   test-framework-hunit,
+                   deepseq
   ghc-options:     -Wall -rtsopts
   hs-source-dirs:  src, src/Data, tests
   -- The following lines trigger a bug in Hackage.  Uncommment for compilation on GHC 6.
