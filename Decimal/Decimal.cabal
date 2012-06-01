@@ -15,6 +15,7 @@ Description:         A decimal number has an integer mantissa and a negative
                     of decimal places in the value.
 Extra-source-files:  README.txt
 tested-with:         GHC==7.0.4
+homepage:            https://github.com/PaulJohnson/Haskell-Decimal
 
 library 
   build-depends:    
