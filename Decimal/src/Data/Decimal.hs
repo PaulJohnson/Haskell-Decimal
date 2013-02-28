@@ -29,8 +29,11 @@ module Data.Decimal (
    (*.),
    divide,
    allocate,
+   eitherFromRational,
+   normalizeDecimal,
 ) where
 
+import Control.Monad.Instances ()
 import Control.DeepSeq
 import Data.Char
 import Data.Ratio
@@ -148,9 +151,8 @@ instance (Integral i) => Num (DecimalRaw i) where
         where (e, n1, n2) = roundMax d1 d2
     d1 - d2 = Decimal e $ fromIntegral (n1 - n2)
         where (e, n1, n2) = roundMax d1 d2
-    d1 * d2 = Decimal e $ fromIntegral $ 
-              (n1 * n2) `divRound` (10 ^ e)
-        where (e, n1, n2) = roundMax d1 d2
+    d1 * d2 = normalizeDecimal $ realFracToDecimal maxBound $ (toRational d1) * (toRational d2)
+
     abs (Decimal e n) = Decimal e $ abs n
     signum (Decimal _ n) = fromIntegral $ signum n
     fromInteger n = Decimal 0 $ fromIntegral n
@@ -204,3 +206,42 @@ allocate (Decimal e n) ps
 -- | Multiply a @DecimalRaw@ by a @RealFrac@ value.
 (*.) :: (Integral i, RealFrac r) => DecimalRaw i -> r -> DecimalRaw i
 (Decimal e m) *. d = Decimal e $ round $ fromIntegral m * d
+
+-- | Count the divisors, i.e. the count of 2 divisors in 18 is 1 because 18 = 2 * 3 * 3
+factorN :: (Integral a)
+           => a                  -- ^ Denominator base
+           -> a                  -- ^ dividing value
+           -> (a, a)             -- ^ The count of divisors and the result of division
+factorN d val = factorN' val 0
+  where
+    factorN' 1 acc = (acc, 1)
+    factorN' v acc = if md == 0
+                     then factorN' vd (acc + 1)
+                     else (acc, v)
+      where
+        (vd, md) = v `divMod` d
+
+-- | Try to convert Rational to Decimal with absolute precision
+-- return string with fail description if not converted
+eitherFromRational :: (Integral i) => Rational -> Either String (DecimalRaw i)
+eitherFromRational r = if done == 1
+                       then do
+                         wres <- we
+                         return $ Decimal wres (fromIntegral m)
+                       else Left $ show r ++ " has no decimal denominator"
+  where
+    den = denominator r
+    num = numerator r
+    (f2, rest) = factorN 2 den
+    (f5, done) = factorN 5 rest
+    e = max f2 f5
+    m = num * ((10^e) `div` den)
+    we = if e > (fromIntegral (maxBound :: Word8)) --  FIXME: will fail if DecimalRaw changed
+         then Left $ show e ++ " is too big ten power to represent as Decimal"
+         else Right $ fromIntegral e
+
+-- | Reduce the exponent of the decimal numer to the minimal posible value
+normalizeDecimal :: (Integral i) => (DecimalRaw i) -> (DecimalRaw i)
+normalizeDecimal r = case eitherFromRational $ toRational r of
+  Right x -> x
+  Left e -> error $ "Imposible happened: " ++ e

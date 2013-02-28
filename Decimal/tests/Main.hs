@@ -140,8 +140,18 @@ prop_sumValid a b = (decimalPlaces a < maxBound && decimalPlaces b < maxBound) =
                     (toRational (a + b) == (toRational a) + (toRational b))
 
 prop_mulValid :: Decimal -> Decimal -> Property
-prop_mulValid a b = (decimalPlaces a + decimalPlaces b < maxBound) ==>
+prop_mulValid a b = ((ad + bd) < fromIntegral (maxBound :: Word8)) ==>
                     (toRational (a * b) == (toRational a) * (toRational b))
+  where
+    ad :: Integer
+    ad = fromIntegral $ decimalPlaces a
+    bd = fromIntegral $ decimalPlaces b
+
+prop_eitherFromRational :: Decimal -> Bool
+prop_eitherFromRational d = (Right d) == (eitherFromRational $ toRational d)
+
+prop_normalizeDecimal :: Decimal -> Bool
+prop_normalizeDecimal d = d == (normalizeDecimal d)
 
 
 main :: IO ()
@@ -176,7 +186,9 @@ tests = [
                 testProperty "abs"                prop_abs,
                 testProperty "signum"             prop_signum,
                 testProperty "sumvalid"           prop_sumValid,
-                testProperty "mulValid"           prop_mulValid
+                testProperty "mulValid"           prop_mulValid,
+                testProperty "eitherFromRational" prop_eitherFromRational,
+                testProperty "normalizeDecimal"   prop_normalizeDecimal
                 ],
         testGroup "Point tests Data.Decimal" [
                 testCase "pi to 3dp"     (dec 3 3142  @=? realFracToDecimal 3 piD),
