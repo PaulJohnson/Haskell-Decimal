@@ -6,8 +6,6 @@ import Data.Word
 import Test.HUnit
 import Control.Applicative
 
-import Debug.Trace
-
 import Test.QuickCheck
 import qualified Test.QuickCheck.Property as P
 import Test.Framework as TF (defaultMain, testGroup, Test)
@@ -26,18 +24,11 @@ instance (Integral i, Arbitrary i) => CoArbitrary (DecimalRaw i) where
     coarbitrary (Decimal e m) gen = variant (v:: Integer) gen
        where v = fromIntegral e + fromIntegral m
   
-ttt a = trace (show a) a
-
-isEQ :: (Eq a, Show a) => a -> a -> P.Result
-isEQ a b = if a == b
-           then P.succeeded
-           else P.failed {P.reason = show a ++ "\nis not equal to \n" ++ show b}
-        
 -- | "read" is the inverse of "show".
 -- 
 -- > read (show n) == n
-prop_readShow :: Decimal -> P.Result
-prop_readShow d =  isEQ (read (show d)) d
+prop_readShow :: Decimal -> Bool
+prop_readShow d =  (read (show d)) == d
 
 -- | Read and show preserve decimal places.
 -- 
@@ -141,7 +132,16 @@ prop_abs d =  decimalPlaces a == decimalPlaces d &&
 -- > signum d == (fromInteger $ signum $ decimalMantissa d)
 prop_signum :: Decimal -> Bool
 prop_signum d =  signum d == (fromInteger $ signum $ decimalMantissa d)
-  
+
+-- | The addition is valid
+                 
+prop_sumValid :: Decimal -> Decimal -> Property
+prop_sumValid a b = (decimalPlaces a < maxBound && decimalPlaces b < maxBound) ==>
+                    (toRational (a + b) == (toRational a) + (toRational b))
+
+prop_mulValid :: Decimal -> Decimal -> Property
+prop_mulValid a b = (decimalPlaces a + decimalPlaces b < maxBound) ==>
+                    (toRational (a * b) == (toRational a) * (toRational b))
 
 
 main :: IO ()
@@ -174,7 +174,9 @@ tests = [
                 testProperty "allocateParts"      prop_allocateParts,
                 testProperty "allocateUnits"      prop_allocateUnits,
                 testProperty "abs"                prop_abs,
-                testProperty "signum"             prop_signum
+                testProperty "signum"             prop_signum,
+                testProperty "sumvalid"           prop_sumValid,
+                testProperty "mulValid"           prop_mulValid
                 ],
         testGroup "Point tests Data.Decimal" [
                 testCase "pi to 3dp"     (dec 3 3142  @=? realFracToDecimal 3 piD),
