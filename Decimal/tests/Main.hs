@@ -154,6 +154,25 @@ prop_normalizeDecimal :: Decimal -> Bool
 prop_normalizeDecimal d = d == (normalizeDecimal d)
 
 
+-- | Division is the inverted multiplication
+prop_divisionMultiplication :: Decimal -> Decimal -> Property
+prop_divisionMultiplication a b = ((ad + bd) < fromIntegral (maxBound :: Word8) && a /= 0 && b /= 0) ==>
+                                  (c / a == b) .&&. (c / b == a)
+  where
+    ad :: Integer
+    ad = fromIntegral $ decimalPlaces a
+    bd = fromIntegral $ decimalPlaces b
+    c = a * b
+
+prop_fromRational :: Decimal -> Bool
+prop_fromRational a = a == (fromRational $ toRational a)
+
+prop_properFraction :: Decimal -> Bool
+prop_properFraction a = a == (fromIntegral b + d)
+  where
+    b :: Integer
+    (b, d) = properFraction a
+
 main :: IO ()
 main = defaultMain tests
 
@@ -188,7 +207,10 @@ tests = [
                 testProperty "sumvalid"           prop_sumValid,
                 testProperty "mulValid"           prop_mulValid,
                 testProperty "eitherFromRational" prop_eitherFromRational,
-                testProperty "normalizeDecimal"   prop_normalizeDecimal
+                testProperty "normalizeDecimal"   prop_normalizeDecimal,
+                testProperty "divisionMultiplication" prop_divisionMultiplication,
+                testProperty "fromRational"       prop_fromRational,
+                testProperty "properFraction"     prop_properFraction
                 ],
         testGroup "Point tests Data.Decimal" [
                 testCase "pi to 3dp"     (dec 3 3142  @=? realFracToDecimal 3 piD),

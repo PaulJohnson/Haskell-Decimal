@@ -160,6 +160,16 @@ instance (Integral i) => Num (DecimalRaw i) where
 instance (Integral i) => Real (DecimalRaw i) where
     toRational (Decimal e n) = fromIntegral n % (10 ^ e)
 
+instance (Integral i) => Fractional (DecimalRaw i) where
+  fromRational r = normalizeDecimal $ realFracToDecimal maxBound r
+  a / b = fromRational $ (toRational a) / (toRational b)
+
+instance (Integral i) => RealFrac (DecimalRaw i) where
+  properFraction a = (rnd, fromRational rep)
+    where
+      (rnd, rep) = properFraction $ toRational a
+      
+  
 
 -- | Divide a @DecimalRaw@ value into one or more portions.  The portions
 -- will be approximately equal, and the sum of the portions is guaranteed to
