@@ -1,8 +1,8 @@
 Name:                Decimal
-Version:             0.2.3
+Version:             0.2.4
 License:             BSD3
 License-file:        LICENSE.txt
-Copyright:           Paul Johnson, 2011
+Copyright:           Paul Johnson, 2013
 Author:              Paul Johnson
 Maintainer:          paul@cogito.org.uk
 Stability:           beta
