@@ -1,3 +1,5 @@
+{-# LANGUAGE DeriveDataTypeable #-}
+
 -- | Decimal numbers are represented as @m*10^(-e)@ where
 -- @m@ and @e@ are integers.  The exponent @e@ is an unsigned Word8.  Hence
 -- the smallest value that can be represented is @10^-255@.
@@ -27,27 +29,16 @@ module Data.Decimal (
    (*.),
    divide,
    allocate,
-   -- ** QuickCheck Properties
-   prop_readShow,
-   prop_readShowPrecision,
-   prop_fromIntegerZero,
-   prop_increaseDecimals,
-   prop_decreaseDecimals,
-   prop_inverseAdd,
-   prop_repeatedAdd,
-   prop_divisionParts,
-   prop_divisionUnits,
-   prop_allocateParts,
-   prop_allocateUnits,
-   prop_abs,
-   prop_signum
+   eitherFromRational,
+   normalizeDecimal,
 ) where
 
+import Control.Monad.Instances ()
 import Control.DeepSeq
 import Data.Char
 import Data.Ratio
 import Data.Word
-import Test.QuickCheck
+import Data.Typeable
 import Text.ParserCombinators.ReadP
 
 -- | Raw decimal arithmetic type constructor.  A decimal value consists of an
@@ -69,6 +60,7 @@ import Text.ParserCombinators.ReadP
 data (Integral i) => DecimalRaw i = Decimal {
       decimalPlaces :: ! Word8,
       decimalMantissa :: ! i}
+                                  deriving (Typeable)
 
 
 -- | Arbitrary precision decimal type.  As a rule programs should do decimal
@@ -159,9 +151,8 @@ instance (Integral i) => Num (DecimalRaw i) where
         where (e, n1, n2) = roundMax d1 d2
     d1 - d2 = Decimal e $ fromIntegral (n1 - n2)
         where (e, n1, n2) = roundMax d1 d2
-    d1 * d2 = Decimal e $ fromIntegral $ 
-              (n1 * n2) `divRound` (10 ^ e)
-        where (e, n1, n2) = roundMax d1 d2
+    d1 * d2 = normalizeDecimal $ realFracToDecimal maxBound $ (toRational d1) * (toRational d2)
+
     abs (Decimal e n) = Decimal e $ abs n
     signum (Decimal _ n) = fromIntegral $ signum n
     fromInteger n = Decimal 0 $ fromIntegral n
@@ -169,16 +160,16 @@ instance (Integral i) => Num (DecimalRaw i) where
 instance (Integral i) => Real (DecimalRaw i) where
     toRational (Decimal e n) = fromIntegral n % (10 ^ e)
 
-instance (Integral i, Arbitrary i) => Arbitrary (DecimalRaw i) where
-    arbitrary = do
-      e <- sized (\n -> resize (n `div` 10) arbitrary) :: Gen Int
-      m <- sized (\n -> resize (n * 10) arbitrary)
-      return $ Decimal (fromIntegral $ abs e) m
-      
-instance (Integral i, Arbitrary i) => CoArbitrary (DecimalRaw i) where
-    coarbitrary (Decimal e m) gen = variant (v:: Integer) gen
-       where v = fromIntegral e + fromIntegral m
+instance (Integral i) => Fractional (DecimalRaw i) where
+  fromRational r = normalizeDecimal $ realFracToDecimal maxBound r
+  a / b = fromRational $ (toRational a) / (toRational b)
 
+instance (Integral i) => RealFrac (DecimalRaw i) where
+  properFraction a = (rnd, fromRational rep)
+    where
+      (rnd, rep) = properFraction $ toRational a
+      
+  
 
 -- | Divide a @DecimalRaw@ value into one or more portions.  The portions
 -- will be approximately equal, and the sum of the portions is guaranteed to
@@ -226,112 +217,41 @@ allocate (Decimal e n) ps
 (*.) :: (Integral i, RealFrac r) => DecimalRaw i -> r -> DecimalRaw i
 (Decimal e m) *. d = Decimal e $ round $ fromIntegral m * d
 
+-- | Count the divisors, i.e. the count of 2 divisors in 18 is 1 because 18 = 2 * 3 * 3
+factorN :: (Integral a)
+           => a                  -- ^ Denominator base
+           -> a                  -- ^ dividing value
+           -> (a, a)             -- ^ The count of divisors and the result of division
+factorN d val = factorN' val 0
+  where
+    factorN' 1 acc = (acc, 1)
+    factorN' v acc = if md == 0
+                     then factorN' vd (acc + 1)
+                     else (acc, v)
+      where
+        (vd, md) = v `divMod` d
 
--- | "read" is the inverse of "show".
--- 
--- > read (show n) == n
-prop_readShow :: Decimal -> Bool
-prop_readShow d =  read (show d) == d
+-- | Try to convert Rational to Decimal with absolute precision
+-- return string with fail description if not converted
+eitherFromRational :: (Integral i) => Rational -> Either String (DecimalRaw i)
+eitherFromRational r = if done == 1
+                       then do
+                         wres <- we
+                         return $ Decimal wres (fromIntegral m)
+                       else Left $ show r ++ " has no decimal denominator"
+  where
+    den = denominator r
+    num = numerator r
+    (f2, rest) = factorN 2 den
+    (f5, done) = factorN 5 rest
+    e = max f2 f5
+    m = num * ((10^e) `div` den)
+    we = if e > (fromIntegral (maxBound :: Word8)) --  FIXME: will fail if DecimalRaw changed
+         then Left $ show e ++ " is too big ten power to represent as Decimal"
+         else Right $ fromIntegral e
 
--- | Read and show preserve decimal places.
--- 
--- > decimalPlaces (read (show n)) == decimalPlaces n
-prop_readShowPrecision :: Decimal -> Bool
-prop_readShowPrecision d =  decimalPlaces (read (show d) :: Decimal) 
-                            == decimalPlaces d
-
-
--- | "fromInteger" definition.
--- 
--- > decimalPlaces (fromInteger n) == 0 &&
--- > decimalMantissa (fromInteger n) == n
-prop_fromIntegerZero :: Integer -> Bool
-prop_fromIntegerZero n =  decimalPlaces (fromInteger n :: Decimal) == 0 &&
-                          decimalMantissa (fromInteger n :: Decimal) == n
-
-
--- | Increased precision does not affect equality.
--- 
--- > decimalPlaces d < maxBound ==> roundTo (decimalPlaces d + 1) d == d
-prop_increaseDecimals :: Decimal -> Property
-prop_increaseDecimals d =  
-    decimalPlaces d < maxBound ==> roundTo (decimalPlaces d + 1) d == d
-
-
--- | Decreased precision can make two decimals equal, but it can never change
--- their order.
--- 
--- > forAll d1, d2 :: Decimal -> legal beforeRound afterRound
--- >      where
--- >         beforeRound = compare d1 d2
--- >         afterRound = compare (roundTo 0 d1) (roundTo 0 d2)
--- >         legal GT x = x `elem` [GT, EQ]
--- >         legal EQ x = x `elem` [EQ]
--- >         legal LT x = x `elem` [LT, EQ]
-prop_decreaseDecimals :: Decimal -> Decimal -> Bool
-prop_decreaseDecimals d1 d2 =  legal beforeRound afterRound
-    where
-      beforeRound = compare d1 d2
-      afterRound = compare (roundTo 0 d1) (roundTo 0 d2)
-      legal GT x = x `elem` [GT, EQ]
-      legal EQ x = x `elem` [EQ]
-      legal LT x = x `elem` [LT, EQ]
-
-
--- | > (x + y) - y == x
-prop_inverseAdd :: Decimal -> Decimal -> Bool
-prop_inverseAdd x y =  (x + y) - y == x
-
-
--- | Multiplication is repeated addition.
--- 
--- > forall d, NonNegative i : (sum $ replicate i d) == d * fromIntegral (max i 0)
-prop_repeatedAdd :: Decimal -> Word8 -> Bool
-prop_repeatedAdd d i = (sum $ replicate (fromIntegral i) d) == d * fromIntegral (max i 0)
-
-
--- | Division produces the right number of parts.
--- 
--- > forall d, Positive i : (sum $ map fst $ divide d i) == i
-prop_divisionParts :: Decimal -> Positive Int -> Property
-prop_divisionParts d (Positive i) =  i > 0 ==> (sum $ map fst $ divide d i) == i
-
-
--- | Division doesn't drop any units.
--- 
--- > forall d, Positive i : (sum $ map (\(n,d1) -> fromIntegral n * d1) $ divide d i) == d
-prop_divisionUnits :: Decimal -> Positive Int -> Bool
-prop_divisionUnits d (Positive i) = 
-    (sum $ map (\(n,d1) -> fromIntegral n * d1) $ divide d i) == d
-
-
--- | Allocate produces the right number of parts.
--- 
--- > sum ps /= 0  ==>  length ps == length (allocate d ps)
-prop_allocateParts :: Decimal -> [Integer] -> Property
-prop_allocateParts d ps =  
-    sum ps /= 0 ==> length ps == length (allocate d ps)
-
-
--- | Allocate doesn't drop any units.
--- 
--- >     sum ps /= 0  ==>  sum (allocate d ps) == d
-prop_allocateUnits :: Decimal -> [Integer] -> Property
-prop_allocateUnits d ps =
-    sum ps /= 0 ==> sum (allocate d ps) == d
-
--- | Absolute value definition
--- 
--- > decimalPlaces a == decimalPlaces d && 
--- > decimalMantissa a == abs (decimalMantissa d)
--- >    where a = abs d
-prop_abs :: Decimal -> Bool
-prop_abs d =  decimalPlaces a == decimalPlaces d && 
-              decimalMantissa a == abs (decimalMantissa d)
-    where a = abs d
-
--- | Sign number defintion
--- 
--- > signum d == (fromInteger $ signum $ decimalMantissa d)
-prop_signum :: Decimal -> Bool
-prop_signum d =  signum d == (fromInteger $ signum $ decimalMantissa d)
+-- | Reduce the exponent of the decimal numer to the minimal posible value
+normalizeDecimal :: (Integral i) => (DecimalRaw i) -> (DecimalRaw i)
+normalizeDecimal r = case eitherFromRational $ toRational r of
+  Right x -> x
+  Left e -> error $ "Imposible happened: " ++ e
