@@ -82,7 +82,7 @@ realFracToDecimal e r = Decimal e $ round (r * (10^e))
 
 -- Internal function to divide and return the nearest integer.
 divRound :: (Integral a) => a -> a -> a
-divRound n1 n2 = if abs r > abs (n2 `quot` 2) then n + signum n else n
+divRound n1 n2 = if abs r >= abs (n2 `quot` 2) then n + signum n else n
     where (n, r) = n1 `quotRem` n2
 
 
