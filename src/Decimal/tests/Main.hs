@@ -7,7 +7,6 @@ import Test.HUnit
 import Control.Applicative
 
 import Test.QuickCheck
-import qualified Test.QuickCheck.Property as P
 import Test.Framework as TF (defaultMain, testGroup, Test)
 import Test.Framework.Providers.HUnit
 import Test.Framework.Providers.QuickCheck2 (testProperty)
@@ -173,6 +172,45 @@ prop_properFraction a = a == (fromIntegral b + d)
     b :: Integer
     (b, d) = properFraction a
 
+
+-- | Builds a property to test whether places after the given
+-- operation is the largest of the places of two operands.
+testPlaces
+  :: (Decimal -> Decimal -> Decimal)
+  -- ^ Operation to test
+  -> Decimal
+  -> Decimal
+  -> Bool
+testPlaces f x y = placesR == max placesX placesY
+  where
+    placesR = decimalPlaces $ f x y
+    (placesX, placesY) = (decimalPlaces x, decimalPlaces y)
+
+
+-- | Places of result of addition is the maximum of the places of
+-- the two operands.
+prop_additionPlaces :: Decimal -> Decimal -> Bool
+prop_additionPlaces = testPlaces (+)
+
+
+-- | Places of result of subtraction is the maximum of the places of
+-- the two operands.
+prop_subtractionPlaces :: Decimal -> Decimal -> Bool
+prop_subtractionPlaces = testPlaces (-)
+
+
+-- | Places of result of multiplication is the maximum of the places of
+-- the two operands.
+prop_multPlaces :: Decimal -> Decimal -> Bool
+prop_multPlaces = testPlaces (*)
+
+
+-- | Places of result of division is the maximum of the places of
+-- the two operands.
+prop_divisionPlaces :: Decimal -> Decimal -> Property
+prop_divisionPlaces x y = y /= 0 ==> testPlaces (/) x y
+
+
 main :: IO ()
 main = defaultMain tests
 
@@ -210,7 +248,11 @@ tests = [
                 testProperty "normalizeDecimal"   prop_normalizeDecimal,
                 testProperty "divisionMultiplication" prop_divisionMultiplication,
                 testProperty "fromRational"       prop_fromRational,
-                testProperty "properFraction"     prop_properFraction
+                testProperty "properFraction"     prop_properFraction,
+                testProperty "additionPlaces"     prop_additionPlaces,
+                testProperty "subtractionPlaces"  prop_subtractionPlaces,
+                testProperty "multPlaces"         prop_multPlaces,
+                testProperty "divisionPlaces"     prop_divisionPlaces
                 ],
         testGroup "Point tests Data.Decimal" [
                 testCase "pi to 3dp"     (dec 3 3142  @=? realFracToDecimal 3 piD),
