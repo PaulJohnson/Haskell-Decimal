@@ -4,15 +4,20 @@
 -- @m@ and @e@ are integers.  The exponent @e@ is an unsigned Word8.  Hence
 -- the smallest value that can be represented is @10^-255@.
 -- 
--- Unary arithmetic results have the exponent of the argument.  Binary
--- arithmetic results have an exponent equal to the maximum of the exponents
--- of the arguments.
+-- Unary arithmetic results have the exponent of the argument.  
+-- Addition and subtraction results have an exponent equal to the 
+-- maximum of the exponents of the arguments. Other operators have
+-- exponents sufficient to show the exact result, up to a limit of
+-- 255:
 -- 
--- Decimal numbers are defined as instances of @Real@.  This means that
--- conventional division is not defined.  Instead the functions @divide@ and 
--- @allocate@ will split a decimal amount into lists of results.  These 
--- results are guaranteed to sum to the original number.  This is a useful
--- property when doing financial arithmetic.
+-- > 0.15 * 0.15 :: Decimal    = 0.0225
+-- > (1/3) :: Decimal          = 0.33333333333333...
+-- > decimalPlaces (1/3)       = 255
+-- 
+-- While @(/)@ is defined, you don't normally want to use it. Instead
+-- The functions "divide" and "allocate" will split a decimal amount 
+-- into lists of results which are guaranteed to sum to the original 
+-- number.  This is a useful property when doing financial arithmetic.
 -- 
 -- The arithmetic on mantissas is always done using @Integer@, regardless of
 -- the type of @DecimalRaw@ being manipulated.  In practice it is recommended
@@ -37,8 +42,6 @@ module Data.Decimal (
 import Control.Monad.Instances ()
 import Control.DeepSeq
 import Data.Char
-import Data.List (sortBy)
-import Data.Ord (comparing)
 import Data.Ratio
 import Data.Word
 import Data.Typeable
@@ -133,7 +136,7 @@ instance (Integral i, Show i) => Show (DecimalRaw i) where
          (intPart, fracPart) = splitAt (max 1 (len - fromIntegral e)) padded
 
 instance (Integral i, Read i) => Read (DecimalRaw i) where
-    readsPrec _ str = readP_to_S readDecimalP str
+    readsPrec _ = readP_to_S readDecimalP
         
 
 -- | Parse a Decimal value. Used for the Read instance.
