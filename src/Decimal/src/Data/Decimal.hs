@@ -57,8 +57,6 @@ import Text.ParserCombinators.ReadP
 -- will return \"1.500\".  Conversely the "Read" instance will use the decimal
 -- places to determine the precision.
 -- 
--- Arithmetic and comparision operators convert their arguments to the 
--- greater of the two precisions, and return a result of that precision.  
 -- Regardless of the type of the arguments, all mantissa arithmetic is done
 -- using @Integer@ types, so application developers do not need to worry about
 -- overflow in the internal algorithms.  However the result of each operator
@@ -75,9 +73,6 @@ data (Integral i) => DecimalRaw i = Decimal {
 -- 
 -- Using this type is also faster because it avoids repeated conversions
 -- to and from @Integer@.
---
--- Note that @reads "12.34e5" :: [Decimal, String]@ will return
--- @[(12, ".234e5"), (12.34, "e5"), (
 type Decimal = DecimalRaw Integer
 
 instance (Integral i, NFData i) => NFData (DecimalRaw i) where
