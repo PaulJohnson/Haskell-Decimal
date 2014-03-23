@@ -20,9 +20,11 @@
 -- number.  This is a useful property when doing financial arithmetic.
 -- 
 -- The arithmetic on mantissas is always done using @Integer@, regardless of
--- the type of @DecimalRaw@ being manipulated.  In practice it is recommended
--- that @Decimal@ be used, with other types being used only where necessary
--- (e.g. to conform to a network protocol).
+-- the type of @DecimalRaw@ being manipulated.  In practice it is strongly
+-- recommended that @Decimal@ be used, with other types being used only where 
+-- necessary (e.g. to conform to a network protocol). For instance 
+-- @(1/3) :: DecimalRaw Int@ does not give the right answer.
+
 
 module Data.Decimal (
    -- ** Decimal Values
@@ -30,6 +32,7 @@ module Data.Decimal (
    Decimal,
    realFracToDecimal,
    decimalConvert,
+   unsafeDecimalConvert,
    roundTo,
    (*.),
    divide,
@@ -67,7 +70,7 @@ data (Integral i) => DecimalRaw i = Decimal {
                                   deriving (Typeable)
 
 
--- | Arbitrary precision decimal type.  As a rule programs should do decimal
+-- | Arbitrary precision decimal type.  Programs should do decimal
 -- arithmetic with this type and only convert to other instances of 
 -- "DecimalRaw" where required by an external interface.
 -- 
@@ -77,6 +80,17 @@ type Decimal = DecimalRaw Integer
 
 instance (Integral i, NFData i) => NFData (DecimalRaw i) where
     rnf (Decimal _ i) = rnf i
+    
+instance (Integral i) => Enum (DecimalRaw i) where
+   succ x = x + 1
+   pred x = x - 1
+   toEnum = fromIntegral
+   fromEnum = fromIntegral . decimalMantissa . roundTo 0
+   enumFrom = iterate (+1)
+   enumFromThen x1 x2 = let dx = x2 - x1 in iterate (+dx) x1
+   enumFromTo x1 x2 = takeWhile (<= x2) $ iterate (+1) x1
+   enumFromThenTo x1 x2 x3 = takeWhile (<= x3) $ enumFromThen x1 x2
+   
 
 -- | Convert a real fractional value into a Decimal of the appropriate 
 -- precision.
@@ -86,19 +100,34 @@ realFracToDecimal e r = Decimal e $ round (r * (10^e))
 
 -- Internal function to divide and return the nearest integer. Rounds 0.5 away from zero.
 divRound :: (Integral a) => a -> a -> a
-divRound n1 n2 = if abs r >= abs (n2 `quot` 2) then n + signum n else n
+divRound n1 n2 = if abs r * 2 >= abs n2 then n + signum n1 else n
     where (n, r) = n1 `quotRem` n2
 
 
 -- | Convert a @DecimalRaw@ from one base representation to another.  Does
--- not check for overflow in the new representation.
-decimalConvert :: (Integral a, Integral b) => DecimalRaw a -> DecimalRaw b
-decimalConvert (Decimal e n) = Decimal e $ fromIntegral n
+-- not check for overflow in the new representation. Only use after
+-- using "roundTo" to put an upper value on the exponent, or to convert
+-- to a larger representation.
+unsafeDecimalConvert :: (Integral a, Integral b) => DecimalRaw a -> DecimalRaw b
+unsafeDecimalConvert (Decimal e n) = Decimal e $ fromIntegral n
+
+
+-- | Convert a @DecimalRaw@ from one base to another. Returns @Nothing@ if
+-- this would cause arithmetic overflow.
+decimalConvert :: (Integral a, Integral b, Bounded b) =>
+   DecimalRaw a -> Maybe (DecimalRaw b)
+decimalConvert (Decimal e n) = 
+   let n1 :: Integer
+       n1 = fromIntegral n
+       n2 = fromIntegral n   -- Of type b.
+       ub = fromIntegral $ max maxBound n2  -- Can't say "maxBound :: b", so do this instead.
+       lb = fromIntegral $ min minBound n2
+   in if lb <= n1 && n1 <= ub then Just $ Decimal e n2 else Nothing
 
 
 -- | Round a @DecimalRaw@ to a specified number of decimal places. 
 -- If the value ends in @5@ then it is rounded away from zero. 
-roundTo :: (Integral i) => Word8 -> DecimalRaw i -> DecimalRaw Integer
+roundTo :: (Integral i) => Word8 -> DecimalRaw i -> DecimalRaw i
 roundTo d (Decimal e n) = Decimal d $ fromIntegral n1
     where
       n1 = case compare d e of
@@ -110,8 +139,7 @@ roundTo d (Decimal e n) = Decimal d $ fromIntegral n1
 
 
 -- Round the two DecimalRaw values to the largest exponent.
-roundMax :: (Integral i) => 
-            DecimalRaw i -> DecimalRaw i -> (Word8, Integer, Integer)
+roundMax :: (Integral i) => DecimalRaw i -> DecimalRaw i -> (Word8, i, i)
 roundMax d1@(Decimal e1 _) d2@(Decimal e2 _) = (e, n1, n2)
     where
       e = max e1 e2
@@ -184,7 +212,11 @@ instance (Integral i) => Real (DecimalRaw i) where
     toRational (Decimal e n) = fromIntegral n % (10 ^ e)
 
 instance (Integral i) => Fractional (DecimalRaw i) where
-  fromRational r = normalizeDecimal $ realFracToDecimal maxBound r
+  fromRational r = 
+     let
+        v :: Decimal
+        v = normalizeDecimal $ realFracToDecimal maxBound r
+     in unsafeDecimalConvert v 
   a / b = fromRational $ toRational a / toRational b
 
 instance (Integral i) => RealFrac (DecimalRaw i) where
@@ -201,12 +233,12 @@ instance (Integral i) => RealFrac (DecimalRaw i) where
 -- The portions are represented as a list of pairs.  The first part of each
 -- pair is the number of portions, and the second part is the portion value.
 -- Hence 10 dollars divided 3 ways will produce @[(2, 3.33), (1, 3.34)]@.
-divide :: (Integral i) => DecimalRaw i -> Int -> [(Int, DecimalRaw i)]
+divide :: Decimal -> Int -> [(Int, Decimal)]
 divide (Decimal e n) d 
     | d > 0 = 
         case n `divMod` fromIntegral d of
-          (result, 0) -> [(fromIntegral d, Decimal e result)]
-          (result, r) -> [(fromIntegral d - fromIntegral r,
+          (result, 0) -> [(d, Decimal e result)]
+          (result, r) -> [(d - fromIntegral r,
                            Decimal e result), 
                           (fromIntegral r, Decimal e (result+1))]
     | otherwise = error "Data.Decimal.divide: Divisor must be > 0."
@@ -222,18 +254,17 @@ divide (Decimal e n) d
 -- 
 -- > let result = allocate d parts
 -- > in all (== d / sum parts) $ zipWith (/) result parts
-allocate :: (Integral i) => DecimalRaw i -> [Integer] -> [DecimalRaw i]
+allocate :: Decimal -> [Integer] -> [Decimal]
 allocate (Decimal e n) ps
     | total == 0  = 
         error "Data.Decimal.allocate: allocation list must not sum to zero."
     | otherwise   = map (Decimal e) $ zipWith (-) ts (tail ts)
     where
       ts = map fst $ scanl nxt (n, total) ps
-      nxt (n1, t1) p1 = (n1 - (n1 * fromIntegral p1) `zdiv` t1, 
-                         t1 - fromIntegral p1)
+      nxt (n1, t1) p1 = (n1 - (n1 * p1) `zdiv` t1, t1 - p1)
       zdiv 0 0 = 0
       zdiv x y = x `divRound` y
-      total = fromIntegral $ sum ps
+      total = sum ps
 
 
 -- | Multiply a @DecimalRaw@ by a @RealFrac@ value.

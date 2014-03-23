@@ -27,8 +27,6 @@ tests and a formal specification. To run the tests do:
    cabal build
    cabal test
 
-Data.Decimal is an instance of Arbitrary, for your convenience in
-writing your own tests.
 
 
 Version 0.2.1
@@ -58,7 +56,14 @@ These changes alter the API. Hence the increment to the major version number.
 
 Thanks to Alexey Uimanov (s9gf4ult at gmail.com).
 
-Version 0.3.2
+Version 0.4.1
 -------------
 
-Improved "Read" instance. Now handles "1.2e3" and "reads" only returns a single parse.
+Improved "Read" instance. Now handles "1.2e3" and "reads" only returns a 
+   single parse.
+Corrected documentation.
+Added "Enum" instance.
+"decimalConvert" now returns a Maybe value. The old version has been renamed
+   to "unsafeDecimalConvert.
+
+   
