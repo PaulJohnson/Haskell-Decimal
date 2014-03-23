@@ -30,12 +30,15 @@ module Data.Decimal (
    divide,
    allocate,
    eitherFromRational,
-   normalizeDecimal,
+   normalizeDecimal
 ) where
+
 
 import Control.Monad.Instances ()
 import Control.DeepSeq
 import Data.Char
+import Data.List (sortBy)
+import Data.Ord (comparing)
 import Data.Ratio
 import Data.Word
 import Data.Typeable
@@ -69,6 +72,9 @@ data (Integral i) => DecimalRaw i = Decimal {
 -- 
 -- Using this type is also faster because it avoids repeated conversions
 -- to and from @Integer@.
+--
+-- Note that @reads "12.34e5" :: [Decimal, String]@ will return
+-- @[(12, ".234e5"), (12.34, "e5"), (
 type Decimal = DecimalRaw Integer
 
 instance (Integral i, NFData i) => NFData (DecimalRaw i) where
@@ -80,9 +86,9 @@ realFracToDecimal :: (Integral i, RealFrac r) => Word8 -> r -> DecimalRaw i
 realFracToDecimal e r = Decimal e $ round (r * (10^e))
 
 
--- Internal function to divide and return the nearest integer.
+-- Internal function to divide and return the nearest integer. Rounds 0.5 away from zero.
 divRound :: (Integral a) => a -> a -> a
-divRound n1 n2 = if abs r > abs (n2 `quot` 2) then n + signum n else n
+divRound n1 n2 = if abs r >= abs (n2 `quot` 2) then n + signum n else n
     where (n, r) = n1 `quotRem` n2
 
 
@@ -92,7 +98,8 @@ decimalConvert :: (Integral a, Integral b) => DecimalRaw a -> DecimalRaw b
 decimalConvert (Decimal e n) = Decimal e $ fromIntegral n
 
 
--- | Round a @DecimalRaw@ to a specified number of decimal places.
+-- | Round a @DecimalRaw@ to a specified number of decimal places. 
+-- If the value ends in @5@ then it is rounded away from zero. 
 roundTo :: (Integral i) => Word8 -> DecimalRaw i -> DecimalRaw Integer
 roundTo d (Decimal e n) = Decimal d $ fromIntegral n1
     where
@@ -116,7 +123,7 @@ roundMax d1@(Decimal e1 _) d2@(Decimal e2 _) = (e, n1, n2)
 
 instance (Integral i, Show i) => Show (DecimalRaw i) where
    showsPrec _ (Decimal e n)
-       | e == 0     = (concat [signStr, strN] ++)
+       | e == 0     = ((signStr ++ strN) ++)
        | otherwise  = (concat [signStr, intPart, ".", fracPart] ++)
        where
          strN = show $ abs n
@@ -126,16 +133,34 @@ instance (Integral i, Show i) => Show (DecimalRaw i) where
          (intPart, fracPart) = splitAt (max 1 (len - fromIntegral e)) padded
 
 instance (Integral i, Read i) => Read (DecimalRaw i) where
-    readsPrec _ = 
-        readP_to_S $ do
-          (intPart, _) <- gather $ do
-                            optional $ char '-'
-                            munch1 isDigit
-          fractPart    <- option "" $ do
+    readsPrec _ str = readP_to_S readDecimalP str
+        
+
+-- | Parse a Decimal value. Used for the Read instance.
+readDecimalP :: (Integral i, Read i) => ReadP (DecimalRaw i)
+readDecimalP = do
+          s1           <- myOpt '+' $ char '-' +++ char '+'
+          intPart      <- munch1 isDigit
+          fractPart    <- myOpt "" $ do
                             _ <- char '.'
                             munch1 isDigit
-          return $ Decimal (fromIntegral $ length fractPart) $ read $ 
-                 intPart ++ fractPart
+          expPart <- myOpt 0 $ do
+                            _  <- char 'e' +++ char 'E'
+                            s2 <- myOpt '+' $ char '-' +++ char '+'
+                            fmap (applySign s2 . strToInt) $ munch1 isDigit
+          let n = applySign s1 $ strToInt $ intPart ++ fractPart
+              e = length fractPart - expPart
+          if e < 0
+             then return $ Decimal 0 $ n * 10 ^ negate e
+             else if e < 256
+                then return $ Decimal (fromIntegral e) n
+                else pfail
+    where
+       strToInt :: (Integral n) => String -> n
+       strToInt = foldl (\t v -> 10 * t + v) 0 . map (fromIntegral . subtract (ord '0') . ord)
+       applySign '-' v = negate v
+       applySign _   v = v
+       myOpt d p = p <++ return d
 
 
 instance (Integral i) => Eq (DecimalRaw i) where
@@ -151,7 +176,7 @@ instance (Integral i) => Num (DecimalRaw i) where
         where (e, n1, n2) = roundMax d1 d2
     d1 - d2 = Decimal e $ fromIntegral (n1 - n2)
         where (e, n1, n2) = roundMax d1 d2
-    d1 * d2 = normalizeDecimal $ realFracToDecimal maxBound $ (toRational d1) * (toRational d2)
+    d1 * d2 = normalizeDecimal $ realFracToDecimal maxBound $ toRational d1 * toRational d2
 
     abs (Decimal e n) = Decimal e $ abs n
     signum (Decimal _ n) = fromIntegral $ signum n
@@ -162,7 +187,7 @@ instance (Integral i) => Real (DecimalRaw i) where
 
 instance (Integral i) => Fractional (DecimalRaw i) where
   fromRational r = normalizeDecimal $ realFracToDecimal maxBound r
-  a / b = fromRational $ (toRational a) / (toRational b)
+  a / b = fromRational $ toRational a / toRational b
 
 instance (Integral i) => RealFrac (DecimalRaw i) where
   properFraction a = (rnd, fromRational rep)
@@ -246,12 +271,12 @@ eitherFromRational r = if done == 1
     (f5, done) = factorN 5 rest
     e = max f2 f5
     m = num * ((10^e) `div` den)
-    we = if e > (fromIntegral (maxBound :: Word8)) --  FIXME: will fail if DecimalRaw changed
+    we = if e > fromIntegral (maxBound :: Word8)
          then Left $ show e ++ " is too big ten power to represent as Decimal"
          else Right $ fromIntegral e
 
--- | Reduce the exponent of the decimal numer to the minimal posible value
-normalizeDecimal :: (Integral i) => (DecimalRaw i) -> (DecimalRaw i)
+-- | Reduce the exponent of the decimal number to the minimal possible value
+normalizeDecimal :: (Integral i) => DecimalRaw i -> DecimalRaw i
 normalizeDecimal r = case eitherFromRational $ toRational r of
   Right x -> x
-  Left e -> error $ "Imposible happened: " ++ e
+  Left e -> error $ "Impossible happened: " ++ e

@@ -21,8 +21,7 @@ QuickCheck Specification
 ------------------------
 
 Data.Decimal includes a set of QuickCheck properties which act as both
-tests and a formal specification (hence their inclusion in the Haddock
-documentation).  To run the tests do:
+tests and a formal specification. To run the tests do:
 
    cabal configure --enable-tests
    cabal build
@@ -49,7 +48,17 @@ Version 0.2.3
 Added instance of NFData from Control.DeepSeq, and hence a dependency
 on the deepseq package, thanks to Jeff Shaw (shawjef3 at msu.edu).
 
-Version 0.2.4
+Version 0.3.1
 -------------
 
-Added Typeable instance.
+Added Typeable, Fractional and RealFrac instances.
+Multiplication now returns an exact result, increasing precision if necessary.
+
+These changes alter the API. Hence the increment to the major version number.
+
+Thanks to Alexey Uimanov (s9gf4ult at gmail.com).
+
+Version 0.3.2
+-------------
+
+Improved "Read" instance. Now handles "1.2e3" and "reads" only returns a single parse.
