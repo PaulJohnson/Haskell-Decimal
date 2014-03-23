@@ -7,7 +7,6 @@ import Test.HUnit
 import Control.Applicative
 
 import Test.QuickCheck
-import qualified Test.QuickCheck.Property as P
 import Test.Framework as TF (defaultMain, testGroup, Test)
 import Test.Framework.Providers.HUnit
 import Test.Framework.Providers.QuickCheck2 (testProperty)
@@ -21,14 +20,14 @@ instance (Integral i, Arbitrary i) => Arbitrary (DecimalRaw i) where
   --   return $ Decimal (fromIntegral $ abs e) m
       
 instance (Integral i, Arbitrary i) => CoArbitrary (DecimalRaw i) where
-    coarbitrary (Decimal e m) gen = variant (v:: Integer) gen
+    coarbitrary (Decimal e m) = variant (v:: Integer)
        where v = fromIntegral e + fromIntegral m
   
 -- | "read" is the inverse of "show".
 -- 
 -- > read (show n) == n
 prop_readShow :: Decimal -> Bool
-prop_readShow d =  (read (show d)) == d
+prop_readShow d =  read (show d) == d
 
 -- | Read and show preserve decimal places.
 -- 
@@ -143,7 +142,7 @@ prop_mulValid :: Decimal -> Decimal -> Property
 prop_mulValid a b = ((ad + bd) < fromIntegral (maxBound :: Word8)) ==>
                     (toRational (a * b) == (toRational a) * (toRational b))
   where
-    ad :: Integer
+    ad, bd :: Integer
     ad = fromIntegral $ decimalPlaces a
     bd = fromIntegral $ decimalPlaces b
 
