@@ -219,6 +219,10 @@ tests = [
                 testCase "1.23 * pi"     (dec 2 386   @=? dec 2 123 *. piD),
                 testCase "Decimal to DecimalRaw Int" 
                                          (decimalConvert (dec 2 123) @=? dec1 2 123),
-                testCase "1.234 to rational" (1234 % 1000 @=? (toRational (dec 3 1234)))
+                testCase "1.234 to rational" (1234 % 1000 @=? toRational (dec 3 1234)),
+                testCase "fromRational (1%10) for DecimalRaw Int"  -- Fixed bug #3
+                                         (let v :: DecimalRaw Int
+                                              v = fromRational (1%10)
+                                          in toRational v @=? 1%10)
                 ]
        ]
