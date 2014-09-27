@@ -64,7 +64,7 @@ import Text.ParserCombinators.ReadP
 -- using @Integer@ types, so application developers do not need to worry about
 -- overflow in the internal algorithms.  However the result of each operator
 -- will be converted to the mantissa type without checking for overflow.
-data (Integral i) => DecimalRaw i = Decimal {
+data DecimalRaw i = Decimal {
       decimalPlaces :: ! Word8,
       decimalMantissa :: ! i}
                                   deriving (Typeable)
@@ -78,7 +78,7 @@ data (Integral i) => DecimalRaw i = Decimal {
 -- to and from @Integer@.
 type Decimal = DecimalRaw Integer
 
-instance (Integral i, NFData i) => NFData (DecimalRaw i) where
+instance (NFData i) => NFData (DecimalRaw i) where
     rnf (Decimal _ i) = rnf i
     
 instance (Integral i) => Enum (DecimalRaw i) where
