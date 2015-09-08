@@ -73,6 +73,16 @@ prop_decreaseDecimals d1 d2 =  legal beforeRound afterRound
       legal EQ x = x `elem` [EQ]
       legal LT x = x `elem` [LT, EQ]
 
+-- | Greedy rounding always produces a larger or equal value when we drop precision
+prop_roundingGreedy :: Decimal -> Property
+prop_roundingGreedy d = 
+   let afterRound = compare d rounded
+       rounded = roundTo' (decimalPlaces d - 1) d
+       legal LT = True
+       legal EQ = True
+       legal GT = False
+   in decimalPlaces d < maxBound ==> legal afterRound
+    
 
 -- | > (x + y) - y == x
 prop_inverseAdd :: Decimal -> Decimal -> Bool
@@ -193,6 +203,7 @@ tests = [
                 testProperty "readShow"           prop_readShow,
                 testProperty "readShowPrecision"  prop_readShowPrecision,
                 testProperty "fromIntegerZero"    prop_fromIntegerZero, 
+                testProperty "roundingGreedy"     prop_roundingGreedy,
                 testProperty "increaseDecimals"   prop_increaseDecimals,
                 testProperty "decreaseDecimals"   prop_decreaseDecimals,
                 testProperty "inverseAdd"         prop_inverseAdd,

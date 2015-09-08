@@ -34,6 +34,7 @@ module Data.Decimal (
    decimalConvert,
    unsafeDecimalConvert,
    roundTo,
+   roundTo',
    (*.),
    divide,
    allocate,
@@ -137,6 +138,27 @@ roundTo d (Decimal e n) = Decimal d $ fromIntegral n1
       divisor = 10 ^ (e-d)
       multiplier = 10 ^ (d-e)
 
+-- Internal function to divide and return the nearest integer. Rounds away from zero.
+divRoundG :: Integral n => n -> n -> n
+divRoundG n divisor = 
+  let n' = n % divisor
+      n'' = floor n'
+      diff = n'' - n
+  in if diff == 0 then n''
+     else n'' + 1 
+      
+
+-- | Round a @DecimalRaw@ to a specified number of decimal places. 
+-- If the value end is not @0@ then it is rounded away from zero. 
+roundTo' :: (Integral i) => Word8 -> DecimalRaw i -> DecimalRaw i
+roundTo' d (Decimal e n) = Decimal d $ fromIntegral n1
+    where
+      n1 = case compare d e of
+             LT -> n `divRoundG` divisor
+             EQ -> n
+             GT -> n * multiplier
+      divisor = 10 ^ (e-d)
+      multiplier = 10 ^ (d-e)
 
 -- Round the two DecimalRaw values to the largest exponent.
 roundMax :: (Integral i) => DecimalRaw i -> DecimalRaw i -> (Word8, i, i)
