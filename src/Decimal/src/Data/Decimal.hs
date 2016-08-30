@@ -24,6 +24,8 @@
 -- recommended that @Decimal@ be used, with other types being used only where 
 -- necessary (e.g. to conform to a network protocol). For instance 
 -- @(1/3) :: DecimalRaw Int@ does not give the right answer.
+--
+-- Operations utilize bankers rounding, when not listed otherwise.
 
 
 module Data.Decimal (
