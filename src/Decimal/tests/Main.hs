@@ -126,7 +126,7 @@ prop_abs d =  decimalPlaces a == decimalPlaces d &&
               decimalMantissa a == abs (decimalMantissa d)
     where a = abs d
 
--- | Sign number defintion
+-- | Sign number definition
 -- 
 -- > signum d == (fromInteger $ signum $ decimalMantissa d)
 prop_signum :: Decimal -> Bool
