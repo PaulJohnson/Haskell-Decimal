@@ -147,8 +147,8 @@ roundTo d (Decimal e n) = Decimal d $ fromIntegral n1
       multiplier = 10 ^ (d-e)
 
 -- | Round a @DecimalRaw@ to a specified number of decimal places using the specified
--- rounding function. Typically this will be one of "floor", "ceiling", "truncate" or "round".
--- Note that @roundTo == roundTo' round@
+-- rounding function. Typically this will be one of @floor@, @ceiling@, @truncate@ or @round@.
+-- Note that @roundTo == roundTo\' round@
 roundTo' :: (Integral i) => (Rational -> i) -> Word8 -> DecimalRaw i -> DecimalRaw i
 roundTo' _ d (Decimal _  0) = Decimal d 0
 roundTo' f d (Decimal e n) = Decimal d $ f n1

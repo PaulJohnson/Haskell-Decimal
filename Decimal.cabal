@@ -2,7 +2,7 @@ Name:                Decimal
 Version:             0.5.1
 License:             BSD3
 License-file:        LICENSE.txt
-Copyright:           Paul Johnson, 2013
+Copyright:           Paul Johnson, 2013, 2018.
 Author:              Paul Johnson
 Maintainer:          paul@cogito.org.uk
 Stability:           beta
@@ -13,7 +13,6 @@ Synopsis:            Decimal numbers with variable precision
 Description:         A decimal number has an integer mantissa and a negative
                     exponent.  The exponent can be interpreted as the number
                     of decimal places in the value.
-Extra-source-files:  README.txt
 tested-with:         GHC==7.4.2
 homepage:            https://github.com/PaulJohnson/Haskell-Decimal
 
@@ -46,4 +45,3 @@ test-suite Main
   default-language: Haskell2010
   main-is:         Main.hs
   other-modules:   Data.Decimal
-  
