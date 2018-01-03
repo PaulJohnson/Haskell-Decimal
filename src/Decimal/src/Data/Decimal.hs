@@ -97,10 +97,16 @@ realFracToDecimal :: (Integral i, RealFrac r) => Word8 -> r -> DecimalRaw i
 realFracToDecimal e r = Decimal e $ round (r * (10^e))
 
 
--- Internal function to divide and return the nearest integer. Rounds 0.5 away from zero.
+-- Internal function to divide and return the nearest integer. Implements Bankers' Rounding in
+-- which 0.5 is rounded to the nearest even value. This follows the practice of "Prelude.round".
 divRound :: (Integral a) => a -> a -> a
-divRound n1 n2 = if abs r * 2 >= abs n2 then n + signum n1 else n
-    where (n, r) = n1 `quotRem` n2
+divRound n1 n2 = n + bankers
+    where
+      (n, r) = n1 `quotRem` n2
+      bankers = case compare (abs r * 2) (abs n2) of
+         LT -> 0
+         GT -> signum n1
+         EQ -> if odd n then signum n1 else 0
 
 
 -- | Convert a @DecimalRaw@ from one base representation to another.  Does
