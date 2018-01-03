@@ -29,6 +29,11 @@ instance (Integral i, Arbitrary i) => CoArbitrary (DecimalRaw i) where
 prop_readShow :: Decimal -> Bool
 prop_readShow d =  read (show d) == d
 
+
+-- | "read" can handle leading spaces.
+prop_readShow1 :: Decimal -> Bool
+prop_readShow1 d = read (" " ++ show d) == d
+
 -- | Read and show preserve decimal places.
 --
 -- > decimalPlaces (read (show n)) == decimalPlaces n
@@ -191,6 +196,7 @@ tests :: [TF.Test]
 tests = [
         testGroup "QuickCheck Data.Decimal" [
                 testProperty "readShow"           prop_readShow,
+                testProperty "readShow1"          prop_readShow1,
                 testProperty "readShowPrecision"  prop_readShowPrecision,
                 testProperty "fromIntegerZero"    prop_fromIntegerZero,
                 testProperty "increaseDecimals"   prop_increaseDecimals,

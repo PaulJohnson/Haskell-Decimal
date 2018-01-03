@@ -172,6 +172,7 @@ instance (Integral i, Read i) => Read (DecimalRaw i) where
 -- | Parse a Decimal value. Used for the Read instance.
 readDecimalP :: (Integral i, Read i) => ReadP (DecimalRaw i)
 readDecimalP = do
+          skipSpaces
           s1           <- myOpt '+' $ char '-' +++ char '+'
           intPart      <- munch1 isDigit
           fractPart    <- myOpt "" $ do
