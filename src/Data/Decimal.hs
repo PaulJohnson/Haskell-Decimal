@@ -136,6 +136,7 @@ decimalConvert (Decimal e n) =
 -- | Round a @DecimalRaw@ to a specified number of decimal places.
 -- If the value ends in @5@ then it is rounded to the nearest even value (Banker's Rounding)
 roundTo :: (Integral i) => Word8 -> DecimalRaw i -> DecimalRaw i
+roundTo d (Decimal _ 0) = Decimal d 0
 roundTo d (Decimal e n) = Decimal d $ fromIntegral n1
     where
       n1 = case compare d e of
@@ -160,11 +161,16 @@ roundTo' f d (Decimal e n) = Decimal d $ f n1
 
 -- Round the two DecimalRaw values to the largest exponent.
 roundMax :: (Integral i) => DecimalRaw i -> DecimalRaw i -> (Word8, i, i)
-roundMax d1@(Decimal e1 _) d2@(Decimal e2 _) = (e, n1, n2)
+roundMax (Decimal _  0)   (Decimal _  0)  = (0,0,0)
+roundMax (Decimal e1 n1)  (Decimal _  0)  = (e1,n1,0)
+roundMax (Decimal _  0)   (Decimal e2 n2) = (e2,0,n2)
+roundMax d1@(Decimal e1 n1) d2@(Decimal e2 n2) 
+  | e1 == e2  = (e1, n1, n2)
+  | otherwise = (e, n1', n2')
     where
       e = max e1 e2
-      (Decimal _ n1) = roundTo e d1
-      (Decimal _ n2) = roundTo e d2
+      (Decimal _ n1') = roundTo e d1
+      (Decimal _ n2') = roundTo e d2
 
 
 instance (Integral i, Show i) => Show (DecimalRaw i) where
