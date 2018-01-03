@@ -7,14 +7,15 @@ Author:              Paul Johnson
 Maintainer:          paul@cogito.org.uk
 Stability:           beta
 Category:            Math
-Cabal-version:       >=1.10
+Cabal-version:       >=1.18
 Build-type:          Simple
 Synopsis:            Decimal numbers with variable precision
 Description:         A decimal number has an integer mantissa and a negative
                     exponent.  The exponent can be interpreted as the number
                     of decimal places in the value.
-tested-with:         GHC==7.4.2
+tested-with:         GHC==8.2.2
 homepage:            https://github.com/PaulJohnson/Haskell-Decimal
+extra-doc-files:     LICENSE.txt, README.md, changelog.md
 
 library
   build-depends:
