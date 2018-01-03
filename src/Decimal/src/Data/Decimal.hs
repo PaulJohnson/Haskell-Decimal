@@ -24,6 +24,12 @@
 -- recommended that @Decimal@ be used, with other types being used only where
 -- necessary (e.g. to conform to a network protocol). For instance
 -- @(1/3) :: DecimalRaw Int@ does not give the right answer.
+--
+-- Care must be taken with literal values of type Decimal. As per the Haskell
+-- Report, the literal @10.00@ will be converted into @fromRational 10.00@, which
+-- in a @Decimal@ context will be converted into @10@ with zero decimal places.
+-- Likewise @10.10@ will be converted into @10.1@ with one decimal place. If
+-- you mean @10.00@ with 2 decimal places then you have to write @roundTo 2 10@.
 
 
 module Data.Decimal (
@@ -58,11 +64,6 @@ import Text.ParserCombinators.ReadP
 -- The "Show" instance will add trailing zeros, so @show $ Decimal 3 1500@
 -- will return \"1.500\".  Conversely the "Read" instance will use the decimal
 -- places to determine the precision.
---
--- Regardless of the type of the arguments, all mantissa arithmetic is done
--- using @Integer@ types, so application developers do not need to worry about
--- overflow in the internal algorithms.  However the result of each operator
--- will be converted to the mantissa type without checking for overflow.
 data DecimalRaw i = Decimal {
       decimalPlaces :: ! Word8,
       decimalMantissa :: ! i}
@@ -71,7 +72,8 @@ data DecimalRaw i = Decimal {
 
 -- | Arbitrary precision decimal type.  Programs should do decimal
 -- arithmetic with this type and only convert to other instances of
--- "DecimalRaw" where required by an external interface.
+-- "DecimalRaw" where required by an external interface. This will avoid
+-- issues with integer overflows.
 --
 -- Using this type is also faster because it avoids repeated conversions
 -- to and from @Integer@.
@@ -208,7 +210,6 @@ instance (Integral i) => Num (DecimalRaw i) where
     d1 - d2 = Decimal e $ fromIntegral (n1 - n2)
         where (e, n1, n2) = roundMax d1 d2
     d1 * d2 = normalizeDecimal $ realFracToDecimal maxBound $ toRational d1 * toRational d2
-
     abs (Decimal e n) = Decimal e $ abs n
     signum (Decimal _ n) = fromIntegral $ signum n
     fromInteger n = Decimal 0 $ fromIntegral n
