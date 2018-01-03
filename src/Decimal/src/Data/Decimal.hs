@@ -3,26 +3,26 @@
 -- | Decimal numbers are represented as @m*10^(-e)@ where
 -- @m@ and @e@ are integers.  The exponent @e@ is an unsigned Word8.  Hence
 -- the smallest value that can be represented is @10^-255@.
--- 
--- Unary arithmetic results have the exponent of the argument.  
--- Addition and subtraction results have an exponent equal to the 
+--
+-- Unary arithmetic results have the exponent of the argument.
+-- Addition and subtraction results have an exponent equal to the
 -- maximum of the exponents of the arguments. Other operators have
 -- exponents sufficient to show the exact result, up to a limit of
 -- 255:
--- 
+--
 -- > 0.15 * 0.15 :: Decimal    = 0.0225
 -- > (1/3) :: Decimal          = 0.33333333333333...
 -- > decimalPlaces (1/3)       = 255
--- 
+--
 -- While @(/)@ is defined, you don't normally want to use it. Instead
--- The functions "divide" and "allocate" will split a decimal amount 
--- into lists of results which are guaranteed to sum to the original 
+-- The functions "divide" and "allocate" will split a decimal amount
+-- into lists of results which are guaranteed to sum to the original
 -- number.  This is a useful property when doing financial arithmetic.
--- 
+--
 -- The arithmetic on mantissas is always done using @Integer@, regardless of
 -- the type of @DecimalRaw@ being manipulated.  In practice it is strongly
--- recommended that @Decimal@ be used, with other types being used only where 
--- necessary (e.g. to conform to a network protocol). For instance 
+-- recommended that @Decimal@ be used, with other types being used only where
+-- necessary (e.g. to conform to a network protocol). For instance
 -- @(1/3) :: DecimalRaw Int@ does not give the right answer.
 
 
@@ -42,7 +42,6 @@ module Data.Decimal (
 ) where
 
 
-import Control.Monad.Instances ()
 import Control.DeepSeq
 import Data.Char
 import Data.Ratio
@@ -53,13 +52,13 @@ import Text.ParserCombinators.ReadP
 -- | Raw decimal arithmetic type constructor.  A decimal value consists of an
 -- integer mantissa and a negative exponent which is interpreted as the number
 -- of decimal places.  The value stored in a @Decimal d@ is therefore equal to:
--- 
+--
 -- > decimalMantissa d / (10 ^ decimalPlaces d)
--- 
+--
 -- The "Show" instance will add trailing zeros, so @show $ Decimal 3 1500@
 -- will return \"1.500\".  Conversely the "Read" instance will use the decimal
 -- places to determine the precision.
--- 
+--
 -- Regardless of the type of the arguments, all mantissa arithmetic is done
 -- using @Integer@ types, so application developers do not need to worry about
 -- overflow in the internal algorithms.  However the result of each operator
@@ -71,16 +70,16 @@ data DecimalRaw i = Decimal {
 
 
 -- | Arbitrary precision decimal type.  Programs should do decimal
--- arithmetic with this type and only convert to other instances of 
+-- arithmetic with this type and only convert to other instances of
 -- "DecimalRaw" where required by an external interface.
--- 
+--
 -- Using this type is also faster because it avoids repeated conversions
 -- to and from @Integer@.
 type Decimal = DecimalRaw Integer
 
 instance (NFData i) => NFData (DecimalRaw i) where
     rnf (Decimal _ i) = rnf i
-    
+
 instance (Integral i) => Enum (DecimalRaw i) where
    succ x = x + 1
    pred x = x - 1
@@ -90,9 +89,9 @@ instance (Integral i) => Enum (DecimalRaw i) where
    enumFromThen x1 x2 = let dx = x2 - x1 in iterate (+dx) x1
    enumFromTo x1 x2 = takeWhile (<= x2) $ iterate (+1) x1
    enumFromThenTo x1 x2 x3 = takeWhile (<= x3) $ enumFromThen x1 x2
-   
 
--- | Convert a real fractional value into a Decimal of the appropriate 
+
+-- | Convert a real fractional value into a Decimal of the appropriate
 -- precision.
 realFracToDecimal :: (Integral i, RealFrac r) => Word8 -> r -> DecimalRaw i
 realFracToDecimal e r = Decimal e $ round (r * (10^e))
@@ -116,7 +115,7 @@ unsafeDecimalConvert (Decimal e n) = Decimal e $ fromIntegral n
 -- this would cause arithmetic overflow.
 decimalConvert :: (Integral a, Integral b, Bounded b) =>
    DecimalRaw a -> Maybe (DecimalRaw b)
-decimalConvert (Decimal e n) = 
+decimalConvert (Decimal e n) =
    let n1 :: Integer
        n1 = fromIntegral n
        n2 = fromIntegral n   -- Of type b.
@@ -125,8 +124,8 @@ decimalConvert (Decimal e n) =
    in if lb <= n1 && n1 <= ub then Just $ Decimal e n2 else Nothing
 
 
--- | Round a @DecimalRaw@ to a specified number of decimal places. 
--- If the value ends in @5@ then it is rounded away from zero. 
+-- | Round a @DecimalRaw@ to a specified number of decimal places.
+-- If the value ends in @5@ then it is rounded away from zero.
 roundTo :: (Integral i) => Word8 -> DecimalRaw i -> DecimalRaw i
 roundTo d (Decimal e n) = Decimal d $ fromIntegral n1
     where
@@ -160,7 +159,7 @@ instance (Integral i, Show i) => Show (DecimalRaw i) where
 
 instance (Integral i, Read i) => Read (DecimalRaw i) where
     readsPrec _ = readP_to_S readDecimalP
-        
+
 
 -- | Parse a Decimal value. Used for the Read instance.
 readDecimalP :: (Integral i, Read i) => ReadP (DecimalRaw i)
@@ -212,34 +211,34 @@ instance (Integral i) => Real (DecimalRaw i) where
     toRational (Decimal e n) = fromIntegral n % (10 ^ e)
 
 instance (Integral i) => Fractional (DecimalRaw i) where
-  fromRational r = 
+  fromRational r =
      let
         v :: Decimal
         v = normalizeDecimal $ realFracToDecimal maxBound r
-     in unsafeDecimalConvert v 
+     in unsafeDecimalConvert v
   a / b = fromRational $ toRational a / toRational b
 
 instance (Integral i) => RealFrac (DecimalRaw i) where
   properFraction a = (rnd, fromRational rep)
     where
       (rnd, rep) = properFraction $ toRational a
-      
-  
+
+
 
 -- | Divide a @DecimalRaw@ value into one or more portions.  The portions
 -- will be approximately equal, and the sum of the portions is guaranteed to
 -- be the original value.
--- 
+--
 -- The portions are represented as a list of pairs.  The first part of each
 -- pair is the number of portions, and the second part is the portion value.
 -- Hence 10 dollars divided 3 ways will produce @[(2, 3.33), (1, 3.34)]@.
 divide :: Decimal -> Int -> [(Int, Decimal)]
-divide (Decimal e n) d 
-    | d > 0 = 
+divide (Decimal e n) d
+    | d > 0 =
         case n `divMod` fromIntegral d of
           (result, 0) -> [(d, Decimal e result)]
           (result, r) -> [(d - fromIntegral r,
-                           Decimal e result), 
+                           Decimal e result),
                           (fromIntegral r, Decimal e (result+1))]
     | otherwise = error "Data.Decimal.divide: Divisor must be > 0."
 
@@ -247,16 +246,16 @@ divide (Decimal e n) d
 
 -- | Allocate a @DecimalRaw@ value proportionately with the values in a list.
 -- The allocated portions are guaranteed to add up to the original value.
--- 
--- Some of the allocations may be zero or negative, but the sum of the list 
+--
+-- Some of the allocations may be zero or negative, but the sum of the list
 -- must not be zero.  The allocation is intended to be as close as possible
 -- to the following:
--- 
+--
 -- > let result = allocate d parts
 -- > in all (== d / sum parts) $ zipWith (/) result parts
 allocate :: Decimal -> [Integer] -> [Decimal]
 allocate (Decimal e n) ps
-    | total == 0  = 
+    | total == 0  =
         error "Data.Decimal.allocate: allocation list must not sum to zero."
     | otherwise   = map (Decimal e) $ zipWith (-) ts (tail ts)
     where
