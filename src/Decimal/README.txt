@@ -13,9 +13,6 @@ allowing for up to 255 decimal places.  Functions preserve precision.
 Binary operators return a result with the precision of the most
 precise argument, so 2.3 + 5.678 = 7.978.
 
-If you need fixed precision decimal arithmetic where the precision is
-known at compile time then Data.Number.Fixed from Lennart Augustsson's
-"numbers" package is more likely to be what you want.
 
 QuickCheck Specification
 ------------------------
@@ -59,11 +56,9 @@ Thanks to Alexey Uimanov (s9gf4ult at gmail.com).
 Version 0.4.1
 -------------
 
-Improved "Read" instance. Now handles "1.2e3" and "reads" only returns a 
+Improved "Read" instance. Now handles "1.2e3" and "reads" only returns a
    single parse.
 Corrected documentation.
 Added "Enum" instance.
 "decimalConvert" now returns a Maybe value. The old version has been renamed
    to "unsafeDecimalConvert.
-
-   

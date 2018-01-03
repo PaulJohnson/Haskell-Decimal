@@ -131,7 +131,7 @@ decimalConvert (Decimal e n) =
 
 
 -- | Round a @DecimalRaw@ to a specified number of decimal places.
--- If the value ends in @5@ then it is rounded away from zero.
+-- If the value ends in @5@ then it is rounded to the nearest even value (Banker's Rounding)
 roundTo :: (Integral i) => Word8 -> DecimalRaw i -> DecimalRaw i
 roundTo d (Decimal e n) = Decimal d $ fromIntegral n1
     where
