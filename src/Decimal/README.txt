@@ -73,3 +73,4 @@ Bankers' Rounding implemented in "roundTo". This rounds values ending in "5" to
 Corrected documentation.
 "Read" instance now handles leading spaces properly.
 Fixed compiler warnings in test suite.
+Added "roundTo'" which allows for truncate, floor and ceiling behaviour when rounding.

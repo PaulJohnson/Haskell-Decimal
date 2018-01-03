@@ -82,6 +82,9 @@ prop_decreaseDecimals (Test d1) (Test d2) =  legal beforeRound afterRound
       legal EQ x = x `elem` [EQ]
       legal LT x = x `elem` [LT, EQ]
 
+-- | @roundTo == roundTo' round@
+prop_roundTo :: TestDec -> Word8 -> Bool
+prop_roundTo (Test d) e = roundTo' round e d == roundTo e d
 
 -- | > (x + y) - y == x
 prop_inverseAdd :: TestDec -> TestDec -> Bool
@@ -206,6 +209,7 @@ tests = [
                 testProperty "fromIntegerZero"    prop_fromIntegerZero,
                 testProperty "increaseDecimals"   prop_increaseDecimals,
                 testProperty "decreaseDecimals"   prop_decreaseDecimals,
+                testProperty "roundTo"            prop_roundTo,
                 testProperty "inverseAdd"         prop_inverseAdd,
                 testProperty "repeatedAdd"        prop_repeatedAdd,
                 testProperty "divisionParts"      prop_divisionParts,

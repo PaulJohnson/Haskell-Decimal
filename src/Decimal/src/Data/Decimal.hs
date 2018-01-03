@@ -40,6 +40,7 @@ module Data.Decimal (
    decimalConvert,
    unsafeDecimalConvert,
    roundTo,
+   roundTo',
    (*.),
    divide,
    allocate,
@@ -144,6 +145,18 @@ roundTo d (Decimal e n) = Decimal d $ fromIntegral n1
       divisor = 10 ^ (e-d)
       multiplier = 10 ^ (d-e)
 
+-- | Round a @DecimalRaw@ to a specified number of decimal places using the specified
+-- rounding function. Typically this will be one of "floor", "ceiling", "truncate" or "round".
+-- Note that @roundTo == roundTo' round@
+roundTo' :: (Integral i) => (Rational -> i) -> Word8 -> DecimalRaw i -> DecimalRaw i
+roundTo' f d (Decimal e n) = Decimal d $ f n1
+   where
+      divisor = 10 ^ (e-d)
+      multiplier = 10 ^ (d-e)
+      n1 = case compare d e of
+         LT -> toRational n / divisor
+         EQ -> toRational n
+         GT -> toRational n * multiplier
 
 -- Round the two DecimalRaw values to the largest exponent.
 roundMax :: (Integral i) => DecimalRaw i -> DecimalRaw i -> (Word8, i, i)
