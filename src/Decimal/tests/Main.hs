@@ -4,7 +4,6 @@ import Data.Decimal
 import Data.Ratio
 import Data.Word
 import Test.HUnit
-import Control.Applicative
 
 import Test.QuickCheck
 import Test.Framework as TF (defaultMain, testGroup, Test)
@@ -12,33 +11,38 @@ import Test.Framework.Providers.HUnit
 import Test.Framework.Providers.QuickCheck2 (testProperty)
 
 
-instance (Integral i, Arbitrary i) => Arbitrary (DecimalRaw i) where
-  arbitrary = Decimal <$> arbitrary <*> arbitrary
+-- | Newtype introduced to avoid orphan instance.
+newtype TestDecRaw i = Test (DecimalRaw i) deriving Show
+
+type TestDec = TestDecRaw Integer
+
+instance (Integral i, Arbitrary i) => Arbitrary (TestDecRaw i) where
+  arbitrary = Test <$> (Decimal <$> arbitrary <*> arbitrary)
   -- arbitrary = do
   --   e <- sized (\n -> resize (n `div` 10) arbitrary) :: Gen Int
   --   m <- sized (\n -> resize (n * 10) arbitrary)
   --   return $ Decimal (fromIntegral $ abs e) m
 
-instance (Integral i, Arbitrary i) => CoArbitrary (DecimalRaw i) where
-    coarbitrary (Decimal e m) = variant (v:: Integer)
+instance (Integral i, Arbitrary i) => CoArbitrary (TestDecRaw i) where
+    coarbitrary (Test (Decimal e m)) = variant (v:: Integer)
        where v = fromIntegral e + fromIntegral m
 
 -- | "read" is the inverse of "show".
 --
 -- > read (show n) == n
-prop_readShow :: Decimal -> Bool
-prop_readShow d =  read (show d) == d
+prop_readShow :: TestDec -> Bool
+prop_readShow (Test d) =  read (show d) == d
 
 
 -- | "read" can handle leading spaces.
-prop_readShow1 :: Decimal -> Bool
-prop_readShow1 d = read (" " ++ show d) == d
+prop_readShow1 :: TestDec -> Bool
+prop_readShow1 (Test d) = read (" " ++ show d) == d
 
 -- | Read and show preserve decimal places.
 --
 -- > decimalPlaces (read (show n)) == decimalPlaces n
-prop_readShowPrecision :: Decimal -> Bool
-prop_readShowPrecision d =  decimalPlaces (read (show d) :: Decimal)
+prop_readShowPrecision :: TestDec -> Bool
+prop_readShowPrecision (Test d) =  decimalPlaces (read (show d) :: Decimal)
                             == decimalPlaces d
 
 
@@ -54,8 +58,8 @@ prop_fromIntegerZero n =  decimalPlaces (fromInteger n :: Decimal) == 0 &&
 -- | Increased precision does not affect equality.
 --
 -- > decimalPlaces d < maxBound ==> roundTo (decimalPlaces d + 1) d == d
-prop_increaseDecimals :: Decimal -> Property
-prop_increaseDecimals d =
+prop_increaseDecimals :: TestDec -> Property
+prop_increaseDecimals (Test d) =
     decimalPlaces d < maxBound ==> roundTo (decimalPlaces d + 1) d == d
 
 
@@ -69,8 +73,8 @@ prop_increaseDecimals d =
 -- >         legal GT x = x `elem` [GT, EQ]
 -- >         legal EQ x = x `elem` [EQ]
 -- >         legal LT x = x `elem` [LT, EQ]
-prop_decreaseDecimals :: Decimal -> Decimal -> Bool
-prop_decreaseDecimals d1 d2 =  legal beforeRound afterRound
+prop_decreaseDecimals :: TestDec -> TestDec -> Bool
+prop_decreaseDecimals (Test d1) (Test d2) =  legal beforeRound afterRound
     where
       beforeRound = compare d1 d2
       afterRound = compare (roundTo 0 d1) (roundTo 0 d2)
@@ -80,45 +84,45 @@ prop_decreaseDecimals d1 d2 =  legal beforeRound afterRound
 
 
 -- | > (x + y) - y == x
-prop_inverseAdd :: Decimal -> Decimal -> Bool
-prop_inverseAdd x y =  (x + y) - y == x
+prop_inverseAdd :: TestDec -> TestDec -> Bool
+prop_inverseAdd (Test x) (Test y) =  (x + y) - y == x
 
 
 -- | Multiplication is repeated addition.
 --
 -- > forall d, NonNegative i : (sum $ replicate i d) == d * fromIntegral (max i 0)
-prop_repeatedAdd :: Decimal -> Word8 -> Bool
-prop_repeatedAdd d i = (sum $ replicate (fromIntegral i) d) == d * fromIntegral (max i 0)
+prop_repeatedAdd :: TestDec -> Word8 -> Bool
+prop_repeatedAdd (Test d) i = (sum $ replicate (fromIntegral i) d) == d * fromIntegral (max i 0)
 
 
 -- | Division produces the right number of parts.
 --
 -- > forall d, Positive i : (sum $ map fst $ divide d i) == i
-prop_divisionParts :: Decimal -> Positive Int -> Property
-prop_divisionParts d (Positive i) =  i > 0 ==> (sum $ map fst $ divide d i) == i
+prop_divisionParts :: TestDec -> Positive Int -> Property
+prop_divisionParts (Test d) (Positive i) =  i > 0 ==> (sum $ map fst $ divide d i) == i
 
 
 -- | Division doesn't drop any units.
 --
 -- > forall d, Positive i : (sum $ map (\(n,d1) -> fromIntegral n * d1) $ divide d i) == d
-prop_divisionUnits :: Decimal -> Positive Int -> Bool
-prop_divisionUnits d (Positive i) =
+prop_divisionUnits :: TestDec -> Positive Int -> Bool
+prop_divisionUnits (Test d) (Positive i) =
     (sum $ map (\(n,d1) -> fromIntegral n * d1) $ divide d i) == d
 
 
 -- | Allocate produces the right number of parts.
 --
 -- > sum ps /= 0  ==>  length ps == length (allocate d ps)
-prop_allocateParts :: Decimal -> [Integer] -> Property
-prop_allocateParts d ps =
+prop_allocateParts :: TestDec -> [Integer] -> Property
+prop_allocateParts (Test d) ps =
     sum ps /= 0 ==> length ps == length (allocate d ps)
 
 
 -- | Allocate doesn't drop any units.
 --
 -- >     sum ps /= 0  ==>  sum (allocate d ps) == d
-prop_allocateUnits :: Decimal -> [Integer] -> Property
-prop_allocateUnits d ps =
+prop_allocateUnits :: TestDec -> [Integer] -> Property
+prop_allocateUnits (Test d) ps =
     sum ps /= 0 ==> sum (allocate d ps) == d
 
 -- | Absolute value definition
@@ -126,53 +130,54 @@ prop_allocateUnits d ps =
 -- > decimalPlaces a == decimalPlaces d &&
 -- > decimalMantissa a == abs (decimalMantissa d)
 -- >    where a = abs d
-prop_abs :: Decimal -> Bool
-prop_abs d =  decimalPlaces a == decimalPlaces d &&
-              decimalMantissa a == abs (decimalMantissa d)
+prop_abs :: TestDec -> Bool
+prop_abs (Test d) =  decimalPlaces a == decimalPlaces d &&
+                     decimalMantissa a == abs (decimalMantissa d)
     where a = abs d
 
--- | Sign number defintion
+-- | Sign number definition
 --
 -- > signum d == (fromInteger $ signum $ decimalMantissa d)
-prop_signum :: Decimal -> Bool
-prop_signum d =  signum d == (fromInteger $ signum $ decimalMantissa d)
+prop_signum :: TestDec -> Bool
+prop_signum (Test d) =  signum d == (fromInteger $ signum $ decimalMantissa d)
 
 -- | The addition is valid
 
-prop_sumValid :: Decimal -> Decimal -> Property
-prop_sumValid a b = (decimalPlaces a < maxBound && decimalPlaces b < maxBound) ==>
+prop_sumValid :: TestDec -> TestDec -> Property
+prop_sumValid (Test a) (Test b) = (decimalPlaces a < maxBound && decimalPlaces b < maxBound) ==>
                     (toRational (a + b) == (toRational a) + (toRational b))
 
-prop_mulValid :: Decimal -> Decimal -> Property
-prop_mulValid a b = ((ad + bd) < fromIntegral (maxBound :: Word8)) ==>
+prop_mulValid :: TestDec -> TestDec -> Property
+prop_mulValid (Test a) (Test b) = ((ad + bd) < fromIntegral (maxBound :: Word8)) ==>
                     (toRational (a * b) == (toRational a) * (toRational b))
   where
     ad, bd :: Integer
     ad = fromIntegral $ decimalPlaces a
     bd = fromIntegral $ decimalPlaces b
 
-prop_eitherFromRational :: Decimal -> Bool
-prop_eitherFromRational d = (Right d) == (eitherFromRational $ toRational d)
+prop_eitherFromRational :: TestDec -> Bool
+prop_eitherFromRational (Test d) = (Right d) == (eitherFromRational $ toRational d)
 
-prop_normalizeDecimal :: Decimal -> Bool
-prop_normalizeDecimal d = d == (normalizeDecimal d)
+prop_normalizeDecimal :: TestDec -> Bool
+prop_normalizeDecimal (Test d) = d == (normalizeDecimal d)
 
 
 -- | Division is the inverted multiplication
-prop_divisionMultiplication :: Decimal -> Decimal -> Property
-prop_divisionMultiplication a b = ((ad + bd) < fromIntegral (maxBound :: Word8) && a /= 0 && b /= 0) ==>
-                                  (c / a == b) .&&. (c / b == a)
+prop_divisionMultiplication :: TestDec -> TestDec -> Property
+prop_divisionMultiplication (Test a) (Test b) =
+      ((ad + bd) < fromIntegral (maxBound :: Word8) && a /= 0 && b /= 0) ==>
+      (c / a == b) .&&. (c / b == a)
   where
     ad :: Integer
     ad = fromIntegral $ decimalPlaces a
     bd = fromIntegral $ decimalPlaces b
     c = a * b
 
-prop_fromRational :: Decimal -> Bool
-prop_fromRational a = a == (fromRational $ toRational a)
+prop_fromRational :: TestDec -> Bool
+prop_fromRational (Test a) = a == (fromRational $ toRational a)
 
-prop_properFraction :: Decimal -> Bool
-prop_properFraction a = a == (fromIntegral b + d)
+prop_properFraction :: TestDec -> Bool
+prop_properFraction (Test a) = a == (fromIntegral b + d)
   where
     b :: Integer
     (b, d) = properFraction a
@@ -226,7 +231,8 @@ tests = [
                 testCase "Decimal to DecimalRaw Int"
                                          (decimalConvert (dec 2 123) @=? Just (dec1 2 123)),
                 testCase "decimalConvert overflow prevention"
-                                         (decimalConvert (1/3) @=? (Nothing :: Maybe (DecimalRaw Int))),
+                                         (decimalConvert (1/3 :: Decimal) @=?
+                                            (Nothing :: Maybe (DecimalRaw Int))),
                 testCase "1.234 to rational" (1234 % 1000 @=? toRational (dec 3 1234)),
                 testCase "fromRational (1%10) for DecimalRaw Int"  -- Fixed bug #3
                                          (let v :: DecimalRaw Int

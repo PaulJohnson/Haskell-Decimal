@@ -62,3 +62,14 @@ Corrected documentation.
 Added "Enum" instance.
 "decimalConvert" now returns a Maybe value. The old version has been renamed
    to "unsafeDecimalConvert.
+
+Version 0.5.1
+-------------
+
+Bankers' Rounding implemented in "roundTo". This rounds values ending in "5" to
+   the nearest even number, in line with the behaviour of "Prelude.round". This
+   is potentially a breaking change for software that depends on the old
+   behavior, so the minor version number has been bumped.
+Corrected documentation.
+"Read" instance now handles leading spaces properly.
+Fixed compiler warnings in test suite.
