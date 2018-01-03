@@ -150,6 +150,7 @@ roundTo d (Decimal e n) = Decimal d $ fromIntegral n1
 -- rounding function. Typically this will be one of "floor", "ceiling", "truncate" or "round".
 -- Note that @roundTo == roundTo' round@
 roundTo' :: (Integral i) => (Rational -> i) -> Word8 -> DecimalRaw i -> DecimalRaw i
+roundTo' _ d (Decimal _  0) = Decimal d 0
 roundTo' f d (Decimal e n) = Decimal d $ f n1
    where
       divisor = 10 ^ (e-d)
@@ -164,7 +165,7 @@ roundMax :: (Integral i) => DecimalRaw i -> DecimalRaw i -> (Word8, i, i)
 roundMax (Decimal _  0)   (Decimal _  0)  = (0,0,0)
 roundMax (Decimal e1 n1)  (Decimal _  0)  = (e1,n1,0)
 roundMax (Decimal _  0)   (Decimal e2 n2) = (e2,0,n2)
-roundMax d1@(Decimal e1 n1) d2@(Decimal e2 n2) 
+roundMax d1@(Decimal e1 n1) d2@(Decimal e2 n2)
   | e1 == e2  = (e1, n1, n2)
   | otherwise = (e, n1', n2')
     where
@@ -225,10 +226,16 @@ instance (Integral i) => Ord (DecimalRaw i) where
 
 
 instance (Integral i) => Num (DecimalRaw i) where
+    (Decimal _ 0) + d = d
+    d + (Decimal _ 0) = d
     d1 + d2 = Decimal e $ fromIntegral (n1 + n2)
         where (e, n1, n2) = roundMax d1 d2
+    (Decimal _ 0) - (Decimal e n) = Decimal e (-n)
+    d - (Decimal _ 0) = d
     d1 - d2 = Decimal e $ fromIntegral (n1 - n2)
         where (e, n1, n2) = roundMax d1 d2
+    (Decimal _ 0) * _ = 0
+    _ * (Decimal _ 0) = 0
     d1 * d2 = normalizeDecimal $ realFracToDecimal maxBound $ toRational d1 * toRational d2
     abs (Decimal e n) = Decimal e $ abs n
     signum (Decimal _ n) = fromIntegral $ signum n
