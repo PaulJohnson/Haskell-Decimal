@@ -66,8 +66,8 @@ import Text.ParserCombinators.ReadP
 -- will return \"1.500\".  Conversely the "Read" instance will use the decimal
 -- places to determine the precision.
 data DecimalRaw i = Decimal {
-      decimalPlaces :: ! Word8,
-      decimalMantissa :: ! i}
+      decimalPlaces :: !Word8,
+      decimalMantissa :: !i}
                                   deriving (Typeable)
 
 
