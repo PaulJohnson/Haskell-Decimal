@@ -7,7 +7,7 @@ Author:              Paul Johnson
 Maintainer:          paul@cogito.org.uk
 Stability:           beta
 Category:            Math
-Cabal-version:       >=1.18
+Cabal-version:       1.18
 Build-type:          Simple
 Synopsis:            Decimal numbers with variable precision
 Description:         A decimal number has an integer mantissa and a negative
