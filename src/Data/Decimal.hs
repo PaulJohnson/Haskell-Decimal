@@ -212,6 +212,7 @@ readDecimalP = do
     where
        strToInt :: (Integral n) => String -> n
        strToInt = foldl (\t v -> 10 * t + v) 0 . map (fromIntegral . subtract (ord '0') . ord)
+       applySign :: (Integral n) => Char -> n -> n
        applySign '-' v = negate v
        applySign _   v = v
        myOpt d p = p <++ return d
